@@ -1,4 +1,4 @@
 
-Attach to a running JVM and browse running classes
+Attach to a running JVM and browse loaded classes
 
 ![ui](ui.png)
