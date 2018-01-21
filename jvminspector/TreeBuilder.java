@@ -13,13 +13,26 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-
+//
+// Make a tree structure from a list of classpaths
+//	Ex:
+//		TreeBuilder.build("root", {foo.bar.classA, foo.bar.classB, foo.classZ});
+//
+//	returns
+//
+//	root
+//	 + foo
+//		+ bar
+//		|  + classA
+//		|  + classB
+//		+ classZ
+//
 public class TreeBuilder {
 
 	public static Node build(String root_name, Set<String> classnames) {
 	
 		// split package name
-		// "top.pack.mod.classname" -> ["top","pack","mod","classname"]
+		// "foo.bar.baz.classname" -> ["foo","bar","baz","classname"]
 		List<List<String>> classpackages = classnames
 				.stream()
 				.map(str -> Arrays.asList(str.split("\\.")))
@@ -51,11 +64,7 @@ public class TreeBuilder {
 
 	private static class Dic {
 
-		private final Map<String, Dic> dic_;
-
-		private Dic() {
-			dic_ = new TreeMap<>();
-		}
+		private final Map<String, Dic> dic_ = new TreeMap<>();
 
 		public Dic register(String key) {
 			Dic subdic = dic_.get(key);
@@ -66,28 +75,8 @@ public class TreeBuilder {
 			return subdic;
 		}
 
-		public boolean contains(String name) {
-			Dic dic = this.get(name);
-			return (dic != null);
-		}
-
-		public boolean contains(String[] coordinates) {
-			Dic dic = this;
-			for (String index : coordinates) {
-				dic = dic.get(index);
-				if (dic == null) {
-					return false;
-				}
-			}
-			return true;
-		}
-
 		public Dic get(String key) {
 			return dic_.get(key);
-		}
-
-		public int size() {
-			return dic_.size();
 		}
 	}
 }

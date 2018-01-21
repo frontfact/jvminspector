@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package jvminspector;
 
 import com.sun.tools.attach.VirtualMachineDescriptor;
@@ -15,11 +10,9 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.logging.Level;
 import org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler;
 import sun.jvm.hotspot.runtime.VM;
 import sun.jvm.hotspot.tools.Tool;
@@ -55,7 +48,7 @@ public final class DumpAgent extends Tool {
 			m.setAccessible(true);
 			m.invoke(this, ((Object)(new String[]{PID})));
 		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
-			Main.logger.log(Level.SEVERE, null, ex);
+			throw new RuntimeException(ex);
 		} finally {
 			stop();
 		}
@@ -94,14 +87,15 @@ public final class DumpAgent extends Tool {
 						ConsoleDecompiler.main(new String[]{file.toString(), output_path});
 					});
 		} catch (IOException ex) {
-			Main.logger.log(Level.SEVERE, null, ex);
+			throw new RuntimeException(ex);
 		}
 	}
 	
 	public static Set<String> dump_private(Mode mode, VirtualMachineDescriptor descriptor, String full_class_name, String output_path) {
 		Set<String> result = Collections.EMPTY_SET;
 		ExecutorService executor = Executors.newSingleThreadExecutor();
-		try {
+		try (AutoCloseable release_executor = executor::shutdown)
+		{
 			Future<Set<String>> future = executor.submit(() -> {
 				System.out.println("Attaching agent...");
 				long startTime = System.currentTimeMillis();
@@ -111,14 +105,9 @@ public final class DumpAgent extends Tool {
 				System.out.println("Agent out : "+(elapsedTime/1000.0)+"s");
 				return agent.get_classnames();
 			});
-			try {
-				result = future.get();
-			} catch (InterruptedException | ExecutionException ex) {
-				Main.logger.log(Level.SEVERE, null, ex);
-				throw new RuntimeException(ex);
-			}
-		} finally {
-			executor.shutdown();
+			result = future.get();
+		} catch (Exception ex) {
+			throw new RuntimeException(ex);
 		}
 		return result;
 	}

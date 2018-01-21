@@ -7,12 +7,10 @@ package jvminspector;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import javax.swing.tree.TreeNode;
-import javax.swing.tree.TreePath;
 
 public final class Node implements TreeNode
 {
@@ -59,27 +57,8 @@ public final class Node implements TreeNode
 		return name_;
 	}
 	
-	public List<Node> getChildren() {
-		return children_;
-	}
-	
 	public void add(Node child) {
 		children_.add(child);
-	}
-	
-	public void sort() {
-		children_.sort(new DefaultComparator());
-	}
-	
-	public TreePath getTreePath()
-	{
-		LinkedList<TreeNode> node_list = new LinkedList<>();
-		TreeNode current = this;
-		while (current != null) {
-			node_list.addFirst(current);
-			current = current.getParent();
-		}
-		return new TreePath(node_list.toArray());
 	}
 	
 	@Override // TreeNode
@@ -129,20 +108,5 @@ public final class Node implements TreeNode
 	public List<Node> childrenList()
 	{
 		return children_;
-	}
-	
-	//
-	// Tri de la vue de l'arbre du design:
-	//	- afficher les modules d'abord, par ordre alphab�tique
-	//	- afficher les bus ensuite, par ordre alphabetique
-	//	- afficher les fils d'un bus par l'endianness lue dans le VCD
-	//
-	public static final class DefaultComparator implements Comparator<Node>
-	{
-		@Override
-		public int compare(Node A, Node B)
-		{
-			return A.getName().compareTo(B.getName());
-		}
 	}
 }

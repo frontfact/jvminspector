@@ -8,13 +8,16 @@ package jvminspector;
 import com.sun.tools.attach.VirtualMachine;
 import com.sun.tools.attach.VirtualMachineDescriptor;
 import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Dialog;
+import java.awt.EventQueue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JLabel;
@@ -30,8 +33,16 @@ import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
  */
 public final class MainWindow extends javax.swing.JDialog {
 	
+	private final Path output_path_;
+	
 	public MainWindow() {
 		super((Dialog)null, true);
+		//
+		try {
+			output_path_ = Files.createTempDirectory("bytedump");
+		} catch (IOException ex) {
+			throw new RuntimeException(ex);
+		}
 		//
 		initComponents();
 		//
@@ -57,21 +68,27 @@ public final class MainWindow extends javax.swing.JDialog {
 			if (object instanceof Node) {
 				Node node = (Node)object;
 				if (node.isLeaf()) {
-					try {
-						Path output_path = Files.createTempDirectory("bytedump");
-						DumpAgent.dump_class(get_current_vm(), node.getFullPath(), output_path.toString());
-						Optional<Path> opt =
-								Files.walk(output_path)
-										.filter(path -> path.toString().endsWith(node.getName()+".java"))
-										.findFirst();
-						if (opt.isPresent()) {
-							editor.setText( Files.lines(opt.get()).collect(Collectors.joining("\n")) );
-						} else {
-							editor.setText("could not find java file in "+output_path);
-						}
-					} catch (IOException ex) {
-						System.out.println(ex);
-					}
+					set_wait_cursor(true);
+					ForkJoinPool.commonPool().submit(() -> {
+						DumpAgent.dump_class(get_current_vm(), node.getFullPath(), output_path_.toString());
+						EventQueue.invokeLater(() -> {
+							try {
+								Optional<Path> opt =
+										Files.walk(output_path_)
+												.filter(path -> path.toString().endsWith(node.getName()+".java"))
+												.findFirst();
+								if (opt.isPresent()) {
+									editor.setText( Files.lines(opt.get()).collect(Collectors.joining("\n")) );
+								} else {
+									editor.setText("could not find java file in "+output_path_);
+								}
+							} catch (IOException ex) {
+								throw new RuntimeException(ex);
+							} finally {
+								set_wait_cursor(false);
+							}
+						});
+					});
 				}
 			}
 		});
@@ -80,6 +97,14 @@ public final class MainWindow extends javax.swing.JDialog {
 		editor.setCodeFoldingEnabled(true);
 		//
 		update_vms_list();
+	}
+	
+	private void set_wait_cursor(boolean state) {
+		if (state) {
+			MainWindow.this.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+		} else {
+			MainWindow.this.setCursor(Cursor.getDefaultCursor());
+		}
 	}
 	
 	public String vm_to_string(VirtualMachineDescriptor vm) {
@@ -99,11 +124,17 @@ public final class MainWindow extends javax.swing.JDialog {
 	}
 	
 	private void update_vm_tree(VirtualMachineDescriptor vm) {
-		Set<String> classnames = DumpAgent.list_classes(vm);
-		System.out.println("got "+classnames.size()+" names");
-		Node hidden_root = TreeBuilder.build(vm_to_string(vm), classnames);
-		treeview.setModel(new DefaultTreeModel(hidden_root));
-		treeview.setRootVisible(true);
+		set_wait_cursor(true);
+		ForkJoinPool.commonPool().submit(() -> {
+			Set<String> classnames = DumpAgent.list_classes(vm);
+			System.out.println("got "+classnames.size()+" names");
+			Node hidden_root = TreeBuilder.build(vm_to_string(vm), classnames);
+			EventQueue.invokeLater(() -> {
+				treeview.setModel(new DefaultTreeModel(hidden_root));
+				treeview.setRootVisible(true);
+				set_wait_cursor(false);
+			});
+		});
 	}
 	
 	private VirtualMachineDescriptor get_current_vm() {
